@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сканер веса</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            text-align: center;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .frame-container {
+            position: relative;
+            width: 300px;
+            height: 200px;
+            margin: 20px auto;
+            background: #f8f8f8;
+            border: 2px dashed #007acc;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .frame-text {
+            color: #007acc;
+            font-size: 14px;
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .photo-input {
+            display: none;
+        }
+        
+        .photo-btn {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        
+        .photo-btn:hover {
+            background: #005a9e;
+        }
+        
+        .preview {
+            max-width: 100%;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        
+        .result {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e8f5e8;
+            border-radius: 8px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📏 Сканер веса</h2>
+        <p>Поместите цифры весов в рамку и сделайте фото</p>
+        
+        <div class="frame-container">
+            <div class="frame-text">
+                📱 Поместите цифры весов<br>
+                в эту рамку и нажмите<br>
+                "Сделать фото"
+            </div>
+        </div>
+        
+        <input type="file" id="photoInput" class="photo-input" accept="image/*" capture="environment">
+        <button class="photo-btn" onclick="takePhoto()">📸 Сделать фото</button>
+        
+        <canvas id="canvas" style="display: none;"></canvas>
+        <img id="preview" class="preview" style="display: none;">
+        
+        <div id="result" class="result">
+            <strong>Обрезанное фото готово!</strong><br>
+            Отправляем в бот для распознавания...
+        </div>
+    </div>
+
+    <script>
+        // Инициализация Telegram WebApp
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+        
+        function takePhoto() {
+            document.getElementById('photoInput').click();
+        }
+        
+        document.getElementById('photoInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                processImage(event.target.result);
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        function processImage(imageSrc) {
+            const img = new Image();
+            img.onload = function() {
+                // Показываем превью
+                const preview = document.getElementById('preview');
+                preview.src = imageSrc;
+                preview.style.display = 'block';
+                
+                // Обрезаем по рамке (центр изображения)
+                const canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Размеры рамки (пропорционально к размеру изображения)
+                const frameWidth = Math.min(img.width * 0.7, 400);
+                const frameHeight = Math.min(img.height * 0.3, 150);
+                
+                canvas.width = frameWidth;
+                canvas.height = frameHeight;
+                
+                // Вырезаем центральную область
+                const startX = (img.width - frameWidth) / 2;
+                const startY = (img.height - frameHeight) / 2;
+                
+                ctx.drawImage(img, startX, startY, frameWidth, frameHeight, 0, 0, frameWidth, frameHeight);
+                
+                // Конвертируем в base64
+                const croppedImage = canvas.toDataURL('image/jpeg', 0.8);
+                
+                // Показываем результат
+                document.getElementById('result').style.display = 'block';
+                
+                // Отправляем в бот через 1 секунду
+                setTimeout(() => {
+                    sendToBot(croppedImage);
+                }, 1000);
+            };
+            img.src = imageSrc;
+        }
+        
+        function sendToBot(imageData) {
+            // Отправляем данные обратно в бот
+            window.Telegram.WebApp.sendData(JSON.stringify({
+                type: 'weight_photo',
+                image: imageData,
+                timestamp: Date.now()
+            }));
+            
+            // Закрываем WebApp
+            window.Telegram.WebApp.close();
+        }
+    </script>
+</body>
+</html> 
