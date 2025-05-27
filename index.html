@@ -256,25 +256,25 @@
         function initEditor() {
             canvas = document.getElementById('editorCanvas');
             ctx = canvas.getContext('2d');
-            
-            const container = document.querySelector('.editor-container');
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-            
+
+            // Жёстко задаём размеры canvas
+            canvas.width = 350;
+            canvas.height = 250;
+
             console.log('Canvas initialized:', canvas.width, 'x', canvas.height);
-            
+
             // Простое масштабирование - фото должно поместиться в canvas
             const scaleX = canvas.width / currentImage.width;
             const scaleY = canvas.height / currentImage.height;
-            scale = Math.min(scaleX, scaleY) * 0.8; // Делаем чуть меньше, чтобы было видно
-            
+            scale = Math.min(scaleX, scaleY) * 0.8;
+
             // Центрируем
             offsetX = (canvas.width - currentImage.width * scale) / 2;
             offsetY = (canvas.height - currentImage.height * scale) / 2;
-            
+
             console.log('Initial setup - Scale:', scale, 'Offset:', offsetX, offsetY);
             console.log('Image will be drawn at size:', currentImage.width * scale, 'x', currentImage.height * scale);
-            
+
             drawImage();
             setupEventListeners();
         }
