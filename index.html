@@ -242,8 +242,13 @@
         function loadImageToEditor(imageSrc) {
             currentImage = new Image();
             currentImage.onload = function() {
+                console.log('Image loaded successfully:', currentImage.width, 'x', currentImage.height);
                 initEditor();
                 showStep(2);
+            };
+            currentImage.onerror = function() {
+                console.error('Failed to load image');
+                alert('Ошибка загрузки изображения');
             };
             currentImage.src = imageSrc;
         }
@@ -256,36 +261,54 @@
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
             
-            // Начальное масштабирование и позиционирование
+            console.log('Canvas initialized:', canvas.width, 'x', canvas.height);
+            
+            // Простое масштабирование - фото должно поместиться в canvas
             const scaleX = canvas.width / currentImage.width;
             const scaleY = canvas.height / currentImage.height;
-            scale = Math.min(scaleX, scaleY);
+            scale = Math.min(scaleX, scaleY) * 0.8; // Делаем чуть меньше, чтобы было видно
             
-            // Центрируем изображение
+            // Центрируем
             offsetX = (canvas.width - currentImage.width * scale) / 2;
             offsetY = (canvas.height - currentImage.height * scale) / 2;
             
-            console.log('Canvas size:', canvas.width, canvas.height);
-            console.log('Image size:', currentImage.width, currentImage.height);
-            console.log('Scale:', scale);
-            console.log('Offset:', offsetX, offsetY);
+            console.log('Initial setup - Scale:', scale, 'Offset:', offsetX, offsetY);
+            console.log('Image will be drawn at size:', currentImage.width * scale, 'x', currentImage.height * scale);
             
             drawImage();
             setupEventListeners();
         }
         
         function drawImage() {
+            // Очищаем canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Рисуем изображение
-            ctx.drawImage(
-                currentImage,
-                offsetX, offsetY,
-                currentImage.width * scale,
-                currentImage.height * scale
-            );
+            // Рисуем серый фон для отладки
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            console.log('Drawing image at:', offsetX, offsetY, 'size:', currentImage.width * scale, currentImage.height * scale);
+            // Проверяем, что изображение загружено
+            if (!currentImage || !currentImage.complete) {
+                console.error('Image not ready for drawing');
+                return;
+            }
+            
+            // Рисуем изображение
+            const drawWidth = currentImage.width * scale;
+            const drawHeight = currentImage.height * scale;
+            
+            console.log('Drawing image:', offsetX, offsetY, drawWidth, drawHeight);
+            
+            try {
+                ctx.drawImage(
+                    currentImage,
+                    offsetX, offsetY,
+                    drawWidth, drawHeight
+                );
+                console.log('Image drawn successfully');
+            } catch (error) {
+                console.error('Error drawing image:', error);
+            }
         }
         
         function setupEventListeners() {
