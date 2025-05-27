@@ -23,6 +23,14 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
+        .step {
+            display: none;
+        }
+        
+        .step.active {
+            display: block;
+        }
+        
         .frame-container {
             position: relative;
             width: 300px;
@@ -47,7 +55,7 @@
             display: none;
         }
         
-        .photo-btn {
+        .btn {
             background: #007acc;
             color: white;
             border: none;
@@ -58,47 +66,140 @@
             margin: 10px;
         }
         
-        .photo-btn:hover {
+        .btn:hover {
             background: #005a9e;
         }
         
-        .preview {
-            max-width: 100%;
-            margin: 10px 0;
-            border-radius: 8px;
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
         
-        .result {
+        .editor-container {
+            position: relative;
+            width: 350px;
+            height: 250px;
+            margin: 20px auto;
+            border: 2px solid #007acc;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        .editor-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: move;
+        }
+        
+        .frame-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 80px;
+            border: 3px solid #ff0000;
+            border-radius: 5px;
+            pointer-events: none;
+            box-shadow: 0 0 0 1000px rgba(0,0,0,0.5);
+        }
+        
+        .frame-label {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff0000;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        
+        .controls {
             margin: 20px 0;
+        }
+        
+        .zoom-controls {
+            margin: 10px 0;
+        }
+        
+        .zoom-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        
+        .instructions {
+            background: #e8f4fd;
             padding: 15px;
-            background: #e8f5e8;
             border-radius: 8px;
-            display: none;
+            margin: 15px 0;
+            font-size: 14px;
+            color: #0066cc;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>📏 Сканер веса</h2>
-        <p>Поместите цифры весов в рамку и сделайте фото</p>
         
-        <div class="frame-container">
-            <div class="frame-text">
-                📱 Поместите цифры весов<br>
-                в эту рамку и нажмите<br>
-                "Сделать фото"
+        <!-- Шаг 1: Выбор фото -->
+        <div id="step1" class="step active">
+            <p>Сделайте фото весов или выберите из галереи</p>
+            
+            <div class="frame-container">
+                <div class="frame-text">
+                    📱 Сфотографируйте весы<br>
+                    (цифры должны быть видны)
+                </div>
+            </div>
+            
+            <input type="file" id="photoInput" class="photo-input" accept="image/*" capture="environment">
+            <button class="btn" onclick="takePhoto()">📸 Сделать фото</button>
+            <button class="btn" onclick="selectFromGallery()">🖼️ Из галереи</button>
+        </div>
+        
+        <!-- Шаг 2: Позиционирование -->
+        <div id="step2" class="step">
+            <p>Подвиньте фото так, чтобы цифры весов попали в красную рамку</p>
+            
+            <div class="instructions">
+                💡 Перетаскивайте фото мышью или пальцем<br>
+                🔍 Используйте кнопки + и - для масштабирования
+            </div>
+            
+            <div class="editor-container">
+                <canvas id="editorCanvas" class="editor-canvas"></canvas>
+                <div class="frame-overlay">
+                    <div class="frame-label">Цифры весов</div>
+                </div>
+            </div>
+            
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomOut()">🔍-</button>
+                <button class="zoom-btn" onclick="resetZoom()">↻</button>
+                <button class="zoom-btn" onclick="zoomIn()">🔍+</button>
+            </div>
+            
+            <div class="controls">
+                <button class="btn" onclick="goBack()">← Назад</button>
+                <button class="btn" onclick="cropAndSend()">✂️ Обрезать и отправить</button>
             </div>
         </div>
         
-        <input type="file" id="photoInput" class="photo-input" accept="image/*" capture="environment">
-        <button class="photo-btn" onclick="takePhoto()">📸 Сделать фото</button>
-        
-        <canvas id="canvas" style="display: none;"></canvas>
-        <img id="preview" class="preview" style="display: none;">
-        
-        <div id="result" class="result">
-            <strong>Обрезанное фото готово!</strong><br>
-            Отправляем в бот для распознавания...
+        <!-- Шаг 3: Результат -->
+        <div id="step3" class="step">
+            <p>Обрезанное фото готово!</p>
+            <canvas id="resultCanvas" style="max-width: 100%; border-radius: 8px;"></canvas>
+            <p>Отправляем в бот для распознавания...</p>
         </div>
     </div>
 
@@ -107,7 +208,23 @@
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
         
+        let currentImage = null;
+        let canvas = null;
+        let ctx = null;
+        let scale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+        let isDragging = false;
+        let lastX = 0;
+        let lastY = 0;
+        
         function takePhoto() {
+            document.getElementById('photoInput').capture = 'environment';
+            document.getElementById('photoInput').click();
+        }
+        
+        function selectFromGallery() {
+            document.getElementById('photoInput').removeAttribute('capture');
             document.getElementById('photoInput').click();
         }
         
@@ -117,59 +234,177 @@
             
             const reader = new FileReader();
             reader.onload = function(event) {
-                processImage(event.target.result);
+                loadImageToEditor(event.target.result);
             };
             reader.readAsDataURL(file);
         });
         
-        function processImage(imageSrc) {
-            const img = new Image();
-            img.onload = function() {
-                // Показываем превью
-                const preview = document.getElementById('preview');
-                preview.src = imageSrc;
-                preview.style.display = 'block';
-                
-                // Обрезаем по рамке (центр изображения)
-                const canvas = document.getElementById('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Размеры рамки (пропорционально к размеру изображения)
-                const frameWidth = Math.min(img.width * 0.7, 400);
-                const frameHeight = Math.min(img.height * 0.3, 150);
-                
-                canvas.width = frameWidth;
-                canvas.height = frameHeight;
-                
-                // Вырезаем центральную область
-                const startX = (img.width - frameWidth) / 2;
-                const startY = (img.height - frameHeight) / 2;
-                
-                ctx.drawImage(img, startX, startY, frameWidth, frameHeight, 0, 0, frameWidth, frameHeight);
-                
-                // Конвертируем в base64
-                const croppedImage = canvas.toDataURL('image/jpeg', 0.8);
-                
-                // Показываем результат
-                document.getElementById('result').style.display = 'block';
-                
-                // Отправляем в бот через 1 секунду
-                setTimeout(() => {
-                    sendToBot(croppedImage);
-                }, 1000);
+        function loadImageToEditor(imageSrc) {
+            currentImage = new Image();
+            currentImage.onload = function() {
+                initEditor();
+                showStep(2);
             };
-            img.src = imageSrc;
+            currentImage.src = imageSrc;
+        }
+        
+        function initEditor() {
+            canvas = document.getElementById('editorCanvas');
+            ctx = canvas.getContext('2d');
+            
+            const container = document.querySelector('.editor-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            
+            // Начальное масштабирование и позиционирование
+            const scaleX = canvas.width / currentImage.width;
+            const scaleY = canvas.height / currentImage.height;
+            scale = Math.max(scaleX, scaleY);
+            
+            offsetX = (canvas.width - currentImage.width * scale) / 2;
+            offsetY = (canvas.height - currentImage.height * scale) / 2;
+            
+            drawImage();
+            setupEventListeners();
+        }
+        
+        function drawImage() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(
+                currentImage,
+                offsetX, offsetY,
+                currentImage.width * scale,
+                currentImage.height * scale
+            );
+        }
+        
+        function setupEventListeners() {
+            // Мышь
+            canvas.addEventListener('mousedown', startDrag);
+            canvas.addEventListener('mousemove', drag);
+            canvas.addEventListener('mouseup', endDrag);
+            
+            // Тач
+            canvas.addEventListener('touchstart', handleTouch);
+            canvas.addEventListener('touchmove', handleTouch);
+            canvas.addEventListener('touchend', endDrag);
+        }
+        
+        function startDrag(e) {
+            isDragging = true;
+            lastX = e.clientX || e.touches[0].clientX;
+            lastY = e.clientY || e.touches[0].clientY;
+        }
+        
+        function drag(e) {
+            if (!isDragging) return;
+            
+            const currentX = e.clientX || e.touches[0].clientX;
+            const currentY = e.clientY || e.touches[0].clientY;
+            
+            offsetX += currentX - lastX;
+            offsetY += currentY - lastY;
+            
+            lastX = currentX;
+            lastY = currentY;
+            
+            drawImage();
+        }
+        
+        function handleTouch(e) {
+            e.preventDefault();
+            if (e.type === 'touchstart') {
+                startDrag(e);
+            } else if (e.type === 'touchmove') {
+                drag(e);
+            }
+        }
+        
+        function endDrag() {
+            isDragging = false;
+        }
+        
+        function zoomIn() {
+            scale *= 1.2;
+            drawImage();
+        }
+        
+        function zoomOut() {
+            scale /= 1.2;
+            drawImage();
+        }
+        
+        function resetZoom() {
+            const scaleX = canvas.width / currentImage.width;
+            const scaleY = canvas.height / currentImage.height;
+            scale = Math.max(scaleX, scaleY);
+            
+            offsetX = (canvas.width - currentImage.width * scale) / 2;
+            offsetY = (canvas.height - currentImage.height * scale) / 2;
+            
+            drawImage();
+        }
+        
+        function cropAndSend() {
+            // Размеры рамки (200x80 по центру)
+            const frameWidth = 200;
+            const frameHeight = 80;
+            const frameX = (canvas.width - frameWidth) / 2;
+            const frameY = (canvas.height - frameHeight) / 2;
+            
+            // Создаём canvas для обрезанного изображения
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = frameWidth;
+            cropCanvas.height = frameHeight;
+            const cropCtx = cropCanvas.getContext('2d');
+            
+            // Вычисляем координаты на исходном изображении
+            const sourceX = (frameX - offsetX) / scale;
+            const sourceY = (frameY - offsetY) / scale;
+            const sourceWidth = frameWidth / scale;
+            const sourceHeight = frameHeight / scale;
+            
+            // Обрезаем
+            cropCtx.drawImage(
+                currentImage,
+                sourceX, sourceY, sourceWidth, sourceHeight,
+                0, 0, frameWidth, frameHeight
+            );
+            
+            // Показываем результат
+            const resultCanvas = document.getElementById('resultCanvas');
+            resultCanvas.width = frameWidth;
+            resultCanvas.height = frameHeight;
+            const resultCtx = resultCanvas.getContext('2d');
+            resultCtx.drawImage(cropCanvas, 0, 0);
+            
+            showStep(3);
+            
+            // Отправляем в бот
+            const croppedImage = cropCanvas.toDataURL('image/jpeg', 0.8);
+            setTimeout(() => {
+                sendToBot(croppedImage);
+            }, 1000);
+        }
+        
+        function goBack() {
+            showStep(1);
+        }
+        
+        function showStep(stepNumber) {
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            document.getElementById('step' + stepNumber).classList.add('active');
         }
         
         function sendToBot(imageData) {
-            // Отправляем данные обратно в бот
             window.Telegram.WebApp.sendData(JSON.stringify({
                 type: 'weight_photo',
                 image: imageData,
                 timestamp: Date.now()
             }));
             
-            // Закрываем WebApp
             window.Telegram.WebApp.close();
         }
     </script>
