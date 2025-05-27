@@ -259,10 +259,16 @@
             // Начальное масштабирование и позиционирование
             const scaleX = canvas.width / currentImage.width;
             const scaleY = canvas.height / currentImage.height;
-            scale = Math.max(scaleX, scaleY);
+            scale = Math.min(scaleX, scaleY);
             
+            // Центрируем изображение
             offsetX = (canvas.width - currentImage.width * scale) / 2;
             offsetY = (canvas.height - currentImage.height * scale) / 2;
+            
+            console.log('Canvas size:', canvas.width, canvas.height);
+            console.log('Image size:', currentImage.width, currentImage.height);
+            console.log('Scale:', scale);
+            console.log('Offset:', offsetX, offsetY);
             
             drawImage();
             setupEventListeners();
@@ -270,12 +276,16 @@
         
         function drawImage() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем изображение
             ctx.drawImage(
                 currentImage,
                 offsetX, offsetY,
                 currentImage.width * scale,
                 currentImage.height * scale
             );
+            
+            console.log('Drawing image at:', offsetX, offsetY, 'size:', currentImage.width * scale, currentImage.height * scale);
         }
         
         function setupEventListeners() {
@@ -337,11 +347,13 @@
         function resetZoom() {
             const scaleX = canvas.width / currentImage.width;
             const scaleY = canvas.height / currentImage.height;
-            scale = Math.max(scaleX, scaleY);
+            scale = Math.min(scaleX, scaleY);
             
+            // Центрируем изображение
             offsetX = (canvas.width - currentImage.width * scale) / 2;
             offsetY = (canvas.height - currentImage.height * scale) / 2;
             
+            console.log('Reset - Scale:', scale, 'Offset:', offsetX, offsetY);
             drawImage();
         }
         
