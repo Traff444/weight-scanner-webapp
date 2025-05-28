@@ -197,9 +197,9 @@
         
         <!-- Шаг 3: Результат -->
         <div id="step3" class="step">
-            <p>Обрезанное фото готово!</p>
+            <p>✅ Фото обрезано и отправлено!</p>
             <canvas id="resultCanvas" style="max-width: 100%; border-radius: 8px;"></canvas>
-            <p>Отправляем в бот для распознавания...</p>
+            <p>Закрываем сканер...</p>
         </div>
     </div>
 
@@ -442,11 +442,9 @@
             
             showStep(3);
             
-            // Отправляем в бот (очень сжато)
+            // Отправляем в бот немедленно
             const croppedImage = cropCanvas.toDataURL('image/jpeg', 0.3);
-            setTimeout(() => {
-                sendToBot(croppedImage);
-            }, 1000);
+            sendToBot(croppedImage);
         }
         
         function goBack() {
@@ -473,40 +471,56 @@
                 // Загружаем обрезанное изображение
                 const tempImg = new Image();
                 tempImg.onload = function() {
-                    // Рисуем изображение большего размера для лучшего OCR
-                    microCtx.drawImage(tempImg, 0, 0, 150, 60);
-                    
-                    // Получаем сжатое изображение с лучшим качеством
-                    const microImageData = microCanvas.toDataURL('image/jpeg', 0.8);
-                    
-                    console.log('Micro image size:', microImageData.length, 'characters');
-                    
-                    // Если изображение всё ещё большое - отправляем без него
-                    let finalData;
-                    if (microImageData.length > 8000) { // Увеличен лимит
-                        console.log('Image still too large, trying more compression...');
-                        // Пробуем ещё более сжатую версию
-                        const superCompressedImage = microCanvas.toDataURL('image/jpeg', 0.3);
+                    try {
+                        // Рисуем изображение большего размера для лучшего OCR
+                        microCtx.drawImage(tempImg, 0, 0, 150, 60);
                         
-                        if (superCompressedImage.length <= 8000) {
-                            console.log('Super compressed image fits, sending it');
+                        // Получаем сжатое изображение с лучшим качеством
+                        const microImageData = microCanvas.toDataURL('image/jpeg', 0.8);
+                        
+                        console.log('Micro image size:', microImageData.length, 'characters');
+                        
+                        // Если изображение всё ещё большое - отправляем без него
+                        let finalData;
+                        if (microImageData.length > 8000) { // Увеличен лимит
+                            console.log('Image still too large, trying more compression...');
+                            // Пробуем ещё более сжатую версию
+                            const superCompressedImage = microCanvas.toDataURL('image/jpeg', 0.3);
+                            
+                            if (superCompressedImage.length <= 8000) {
+                                console.log('Super compressed image fits, sending it');
+                                finalData = {
+                                    type: 'weight_photo_micro',
+                                    message: 'Сильно сжатое обрезанное фото для OCR',
+                                    image: superCompressedImage,
+                                    crop_area: {
+                                        x: Math.round((canvas.width - 200) / 2),
+                                        y: Math.round((canvas.height - 80) / 2),
+                                        width: 200,
+                                        height: 80
+                                    },
+                                    timestamp: Date.now()
+                                };
+                            } else {
+                                console.log('Even super compressed is too large, sending metadata only');
+                                finalData = {
+                                    type: 'weight_scan_request',
+                                    message: 'Изображение слишком большое для передачи',
+                                    crop_area: {
+                                        x: Math.round((canvas.width - 200) / 2),
+                                        y: Math.round((canvas.height - 80) / 2),
+                                        width: 200,
+                                        height: 80
+                                    },
+                                    timestamp: Date.now()
+                                };
+                            }
+                        } else {
+                            console.log('Sending with micro image');
                             finalData = {
                                 type: 'weight_photo_micro',
-                                message: 'Сильно сжатое обрезанное фото для OCR',
-                                image: superCompressedImage,
-                                crop_area: {
-                                    x: Math.round((canvas.width - 200) / 2),
-                                    y: Math.round((canvas.height - 80) / 2),
-                                    width: 200,
-                                    height: 80
-                                },
-                                timestamp: Date.now()
-                            };
-                        } else {
-                            console.log('Even super compressed is too large, sending metadata only');
-                            finalData = {
-                                type: 'weight_scan_request',
-                                message: 'Изображение слишком большое для передачи',
+                                message: 'Обрезанное фото для OCR',
+                                image: microImageData,
                                 crop_area: {
                                     x: Math.round((canvas.width - 200) / 2),
                                     y: Math.round((canvas.height - 80) / 2),
@@ -516,52 +530,65 @@
                                 timestamp: Date.now()
                             };
                         }
-                    } else {
-                        console.log('Sending with micro image');
-                        finalData = {
-                            type: 'weight_photo_micro',
-                            message: 'Обрезанное фото для OCR',
-                            image: microImageData,
-                            crop_area: {
-                                x: Math.round((canvas.width - 200) / 2),
-                                y: Math.round((canvas.height - 80) / 2),
-                                width: 200,
-                                height: 80
-                            },
-                            timestamp: Date.now()
-                        };
-                    }
-                    
-                    const dataToSend = JSON.stringify(finalData);
-                    console.log('Final data size:', dataToSend.length, 'characters');
-                    console.log('Data content:', dataToSend);
-                    
-                    // Проверяем, что WebApp готов
-                    if (window.Telegram && window.Telegram.WebApp) {
-                        console.log('WebApp is ready, sending data...');
-                        window.Telegram.WebApp.sendData(dataToSend);
                         
-                        // Принудительно закрываем WebApp через небольшой таймаут
-                        setTimeout(() => {
+                        const dataToSend = JSON.stringify(finalData);
+                        console.log('Final data size:', dataToSend.length, 'characters');
+                        console.log('Data content type:', finalData.type);
+                        
+                        // Проверяем, что WebApp готов
+                        if (window.Telegram && window.Telegram.WebApp) {
+                            console.log('WebApp is ready, sending data...');
+                            
+                            try {
+                                window.Telegram.WebApp.sendData(dataToSend);
+                                console.log('Data sent successfully');
+                            } catch (sendError) {
+                                console.error('Error sending data:', sendError);
+                            }
+                            
+                            // Принудительно закрываем WebApp немедленно
                             console.log('Closing WebApp...');
                             window.Telegram.WebApp.close();
-                        }, 500);
-                    } else {
-                        console.error('Telegram WebApp not available');
-                        alert('Ошибка: Telegram WebApp недоступен');
+                            
+                            // Fallback: если не закрылся, попробуем ещё раз через 100ms
+                            setTimeout(() => {
+                                console.log('Fallback closing WebApp...');
+                                window.Telegram.WebApp.close();
+                            }, 100);
+                            
+                        } else {
+                            console.error('Telegram WebApp not available');
+                            alert('Ошибка: Telegram WebApp недоступен');
+                        }
+                        
+                    } catch (processError) {
+                        console.error('Error processing image:', processError);
+                        alert('Ошибка обработки изображения: ' + processError.message);
+                        // Закрываем WebApp даже при ошибке
+                        if (window.Telegram && window.Telegram.WebApp) {
+                            window.Telegram.WebApp.close();
+                        }
                     }
                 };
                 
                 tempImg.onerror = function() {
                     console.error('Failed to load cropped image');
-                    alert('Ошибка обработки изображения');
+                    alert('Ошибка загрузки обрезанного изображения');
+                    // Закрываем WebApp при ошибке
+                    if (window.Telegram && window.Telegram.WebApp) {
+                        window.Telegram.WebApp.close();
+                    }
                 };
                 
                 tempImg.src = imageData;
                 
             } catch (error) {
-                console.error('Error sending data:', error);
+                console.error('Error in sendToBot:', error);
                 alert('Ошибка отправки данных: ' + error.message);
+                // Закрываем WebApp при ошибке
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.close();
+                }
             }
         }
     </script>
