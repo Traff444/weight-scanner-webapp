@@ -466,8 +466,8 @@
             try {
                 // Создаём микро-изображение для OCR
                 const microCanvas = document.createElement('canvas');
-                microCanvas.width = 300;  // Увеличено с 50 (потом с 150 до 300)
-                microCanvas.height = 120;  // Увеличено с 20 (с 60 до 120)
+                microCanvas.width = 300;  // Увеличено с 50
+                microCanvas.height = 120;  // Увеличено с 20
                 const microCtx = microCanvas.getContext('2d');
                 
                 // Загружаем обрезанное изображение
@@ -477,25 +477,45 @@
                     microCtx.drawImage(tempImg, 0, 0, 150, 60);
                     
                     // Получаем сжатое изображение с лучшим качеством
-                    const microImageData = microCanvas.toDataURL('image/jpeg', 1.0);
+                    const microImageData = microCanvas.toDataURL('image/jpeg', 0.8);
                     
                     console.log('Micro image size:', microImageData.length, 'characters');
                     
                     // Если изображение всё ещё большое - отправляем без него
                     let finalData;
-                    if (microImageData.length > 4000) { // Увеличен лимит
-                        console.log('Image still too large, sending metadata only');
-                        finalData = {
-                            type: 'weight_scan_request',
-                            message: 'Изображение слишком большое для передачи',
-                            crop_area: {
-                                x: Math.round((canvas.width - 200) / 2),
-                                y: Math.round((canvas.height - 80) / 2),
-                                width: 200,
-                                height: 80
-                            },
-                            timestamp: Date.now()
-                        };
+                    if (microImageData.length > 8000) { // Увеличен лимит
+                        console.log('Image still too large, trying more compression...');
+                        // Пробуем ещё более сжатую версию
+                        const superCompressedImage = microCanvas.toDataURL('image/jpeg', 0.3);
+                        
+                        if (superCompressedImage.length <= 8000) {
+                            console.log('Super compressed image fits, sending it');
+                            finalData = {
+                                type: 'weight_photo_micro',
+                                message: 'Сильно сжатое обрезанное фото для OCR',
+                                image: superCompressedImage,
+                                crop_area: {
+                                    x: Math.round((canvas.width - 200) / 2),
+                                    y: Math.round((canvas.height - 80) / 2),
+                                    width: 200,
+                                    height: 80
+                                },
+                                timestamp: Date.now()
+                            };
+                        } else {
+                            console.log('Even super compressed is too large, sending metadata only');
+                            finalData = {
+                                type: 'weight_scan_request',
+                                message: 'Изображение слишком большое для передачи',
+                                crop_area: {
+                                    x: Math.round((canvas.width - 200) / 2),
+                                    y: Math.round((canvas.height - 80) / 2),
+                                    width: 200,
+                                    height: 80
+                                },
+                                timestamp: Date.now()
+                            };
+                        }
                     } else {
                         console.log('Sending with micro image');
                         finalData = {
