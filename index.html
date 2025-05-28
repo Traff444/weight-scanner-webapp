@@ -461,29 +461,29 @@
         }
         
         function sendToBot(imageData) {
-            console.log('Sending data to bot...');
+            console.log('Sending micro image to bot...');
             
             try {
                 // Создаём микро-изображение для OCR
                 const microCanvas = document.createElement('canvas');
-                microCanvas.width = 50;
-                microCanvas.height = 20;
+                microCanvas.width = 150;  // Увеличено с 50
+                microCanvas.height = 60;  // Увеличено с 20
                 const microCtx = microCanvas.getContext('2d');
                 
                 // Загружаем обрезанное изображение
                 const tempImg = new Image();
                 tempImg.onload = function() {
-                    // Рисуем очень маленькое изображение
-                    microCtx.drawImage(tempImg, 0, 0, 50, 20);
+                    // Рисуем изображение большего размера для лучшего OCR
+                    microCtx.drawImage(tempImg, 0, 0, 150, 60);
                     
-                    // Получаем максимально сжатое изображение
-                    const microImageData = microCanvas.toDataURL('image/jpeg', 0.1);
+                    // Получаем сжатое изображение с лучшим качеством
+                    const microImageData = microCanvas.toDataURL('image/jpeg', 0.4);
                     
                     console.log('Micro image size:', microImageData.length, 'characters');
                     
                     // Если изображение всё ещё большое - отправляем без него
                     let finalData;
-                    if (microImageData.length > 3000) {
+                    if (microImageData.length > 4000) { // Увеличен лимит
                         console.log('Image still too large, sending metadata only');
                         finalData = {
                             type: 'weight_scan_request',
