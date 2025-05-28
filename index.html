@@ -98,8 +98,8 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 200px;
-            height: 60px;
+            width: 300px;
+            height: 90px;
             border: 3px solid #ff0000;
             border-radius: 5px;
             pointer-events: none;
@@ -403,13 +403,13 @@
         }
         
         function cropAndSend() {
-            // Размеры рамки - возвращаем к большему размеру для лучшего качества
-            const frameWidth = 200;  // Увеличено с 100
-            const frameHeight = 60;   // Увеличено с 40
+            // Размеры рамки - увеличиваем для лучшего качества OCR
+            const frameWidth = 300;  // Увеличено с 200
+            const frameHeight = 90;   // Увеличено с 60
             const frameX = (canvas.width - frameWidth) / 2; 
             const frameY = (canvas.height - frameHeight) / 2;
             
-            // Создаём canvas для обрезанного изображения
+            // Создаём canvas для обрезанного изображения (только для предварительного просмотра)
             const cropCanvas = document.createElement('canvas');
             cropCanvas.width = frameWidth;
             cropCanvas.height = frameHeight;
@@ -421,7 +421,7 @@
             const sourceWidth = frameWidth / scale;
             const sourceHeight = frameHeight / scale;
             
-            // Обрезаем с высоким качеством
+            // Обрезаем для предварительного просмотра
             cropCtx.drawImage(
                 currentImage,
                 sourceX, sourceY, sourceWidth, sourceHeight,
@@ -437,9 +437,8 @@
             
             showStep(3);
             
-            // Отправляем в бот с агрессивным сжатием
-            const croppedImage = cropCanvas.toDataURL('image/jpeg', 0.3); // Низкое качество для передачи
-            sendToBot(croppedImage);
+            // Отправляем только координаты (НЕ изображение!)
+            sendToBot();
         }
         
         function goBack() {
@@ -453,120 +452,80 @@
             document.getElementById('step' + stepNumber).classList.add('active');
         }
         
-        function sendToBot(imageData) {
-            console.log('Sending micro image to bot...');
+        function sendToBot() {
+            console.log('Sending crop coordinates to bot...');
             
             try {
-                // Создаём изображение напрямую из обрезанных данных (200x60)
-                const tempImg = new Image();
-                tempImg.onload = function() {
+                // Вычисляем координаты обрезки в процентах от исходного изображения
+                const frameWidth = 300;
+                const frameHeight = 90;
+                const frameX = (canvas.width - frameWidth) / 2;
+                const frameY = (canvas.height - frameHeight) / 2;
+                
+                // Переводим координаты canvas в координаты исходного изображения
+                const sourceX = (frameX - offsetX) / scale;
+                const sourceY = (frameY - offsetY) / scale;
+                const sourceWidth = frameWidth / scale;
+                const sourceHeight = frameHeight / scale;
+                
+                // Нормализуем координаты (в процентах от исходного изображения)
+                const cropData = {
+                    x_percent: sourceX / currentImage.width,
+                    y_percent: sourceY / currentImage.height,
+                    width_percent: sourceWidth / currentImage.width,
+                    height_percent: sourceHeight / currentImage.height,
+                    // Абсолютные координаты для отладки
+                    abs_x: Math.round(sourceX),
+                    abs_y: Math.round(sourceY),
+                    abs_width: Math.round(sourceWidth),
+                    abs_height: Math.round(sourceHeight),
+                    original_image_size: {
+                        width: currentImage.width,
+                        height: currentImage.height
+                    }
+                };
+                
+                console.log('Crop coordinates calculated:', cropData);
+                
+                const finalData = {
+                    type: 'weight_crop_coordinates',
+                    message: 'Координаты для обрезки последнего фото',
+                    crop_data: cropData,
+                    timestamp: Date.now()
+                };
+                
+                const dataToSend = JSON.stringify(finalData);
+                console.log('Final data size:', dataToSend.length, 'characters');
+                console.log('Data content:', finalData);
+                
+                // Проверяем, что WebApp готов
+                if (window.Telegram && window.Telegram.WebApp) {
+                    console.log('WebApp is ready, sending coordinates...');
+                    
                     try {
-                        // Проверяем размер изображения
-                        console.log('Cropped image size:', tempImg.width, 'x', tempImg.height);
-                        
-                        // Пробуем разные уровни сжатия
-                        let finalData;
-                        let attempts = [0.1, 0.2, 0.3, 0.4, 0.5]; // Очень агрессивное сжатие
-                        
-                        for (let quality of attempts) {
-                            const compressedImage = document.createElement('canvas');
-                            compressedImage.width = tempImg.width;
-                            compressedImage.height = tempImg.height;
-                            const compCtx = compressedImage.getContext('2d');
-                            compCtx.drawImage(tempImg, 0, 0);
-                            
-                            const testImageData = compressedImage.toDataURL('image/jpeg', quality);
-                            console.log(`Quality ${quality}: ${testImageData.length} characters`);
-                            
-                            if (testImageData.length <= 7000) { // Оставляем запас
-                                console.log(`Using quality ${quality}, size: ${testImageData.length}`);
-                                finalData = {
-                                    type: 'weight_photo_micro',
-                                    message: 'Обрезанное фото для OCR',
-                                    image: testImageData,
-                                    crop_area: {
-                                        x: Math.round((canvas.width - 200) / 2),
-                                        y: Math.round((canvas.height - 60) / 2),
-                                        width: 200,
-                                        height: 60
-                                    },
-                                    timestamp: Date.now()
-                                };
-                                break;
-                            }
-                        }
-                        
-                        // Если даже самое сильное сжатие не помогло - отправляем метаданные
-                        if (!finalData) {
-                            console.log('Image too large even with maximum compression, sending metadata only');
-                            finalData = {
-                                type: 'weight_scan_request',
-                                message: 'Изображение слишком большое для передачи',
-                                crop_area: {
-                                    x: Math.round((canvas.width - 200) / 2),
-                                    y: Math.round((canvas.height - 60) / 2),
-                                    width: 200,
-                                    height: 60
-                                },
-                                timestamp: Date.now()
-                            };
-                        }
-                        
-                        const dataToSend = JSON.stringify(finalData);
-                        console.log('Final data size:', dataToSend.length, 'characters');
-                        console.log('Data content type:', finalData.type);
-                        
-                        // Проверяем, что WebApp готов
-                        if (window.Telegram && window.Telegram.WebApp) {
-                            console.log('WebApp is ready, sending data...');
-                            
-                            try {
-                                window.Telegram.WebApp.sendData(dataToSend);
-                                console.log('Data sent successfully');
-                            } catch (sendError) {
-                                console.error('Error sending data:', sendError);
-                            }
-                            
-                            // Принудительно закрываем WebApp немедленно
-                            console.log('Closing WebApp...');
-                            window.Telegram.WebApp.close();
-                            
-                            // Fallback: если не закрылся, попробуем ещё раз через 100ms
-                            setTimeout(() => {
-                                console.log('Fallback closing WebApp...');
-                                window.Telegram.WebApp.close();
-                            }, 100);
-                            
-                        } else {
-                            console.error('Telegram WebApp not available');
-                            alert('Ошибка: Telegram WebApp недоступен');
-                        }
-                        
-                    } catch (processError) {
-                        console.error('Error processing image:', processError);
-                        alert('Ошибка обработки изображения: ' + processError.message);
-                        // Закрываем WebApp даже при ошибке
-                        if (window.Telegram && window.Telegram.WebApp) {
-                            window.Telegram.WebApp.close();
-                        }
+                        window.Telegram.WebApp.sendData(dataToSend);
+                        console.log('Coordinates sent successfully');
+                    } catch (sendError) {
+                        console.error('Error sending data:', sendError);
                     }
-                };
-                
-                tempImg.onerror = function() {
-                    console.error('Failed to load cropped image');
-                    alert('Ошибка загрузки обрезанного изображения');
-                    // Закрываем WebApp при ошибке
-                    if (window.Telegram && window.Telegram.WebApp) {
+                    
+                    // Принудительно закрываем WebApp
+                    console.log('Closing WebApp...');
+                    window.Telegram.WebApp.close();
+                    
+                    setTimeout(() => {
+                        console.log('Fallback closing WebApp...');
                         window.Telegram.WebApp.close();
-                    }
-                };
-                
-                tempImg.src = imageData;
+                    }, 100);
+                    
+                } else {
+                    console.error('Telegram WebApp not available');
+                    alert('Ошибка: Telegram WebApp недоступен');
+                }
                 
             } catch (error) {
                 console.error('Error in sendToBot:', error);
                 alert('Ошибка отправки данных: ' + error.message);
-                // Закрываем WebApp при ошибке
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.close();
                 }
