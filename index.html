@@ -208,6 +208,28 @@
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
         
+        // Добавляем обработчики событий для отладки
+        window.Telegram.WebApp.onEvent('mainButtonClicked', function() {
+            console.log('Main button clicked');
+        });
+        
+        window.Telegram.WebApp.onEvent('backButtonClicked', function() {
+            console.log('Back button clicked');
+        });
+        
+        window.Telegram.WebApp.onEvent('settingsButtonClicked', function() {
+            console.log('Settings button clicked');
+        });
+        
+        window.Telegram.WebApp.onEvent('invoiceClosed', function(eventData) {
+            console.log('Invoice closed:', eventData);
+        });
+        
+        // Проверяем доступность WebApp API
+        console.log('Telegram WebApp initialized:', !!window.Telegram.WebApp);
+        console.log('WebApp version:', window.Telegram.WebApp.version);
+        console.log('WebApp platform:', window.Telegram.WebApp.platform);
+        
         let currentImage = null;
         let canvas = null;
         let ctx = null;
@@ -434,13 +456,35 @@
         }
         
         function sendToBot(imageData) {
-            window.Telegram.WebApp.sendData(JSON.stringify({
-                type: 'weight_photo',
-                image: imageData,
-                timestamp: Date.now()
-            }));
+            console.log('Sending data to bot...');
             
-            window.Telegram.WebApp.close();
+            try {
+                const dataToSend = JSON.stringify({
+                    type: 'weight_photo',
+                    image: imageData,
+                    timestamp: Date.now()
+                });
+                
+                console.log('Data prepared, size:', dataToSend.length);
+                
+                // Проверяем, что WebApp готов
+                if (window.Telegram && window.Telegram.WebApp) {
+                    console.log('WebApp is ready, sending data...');
+                    window.Telegram.WebApp.sendData(dataToSend);
+                    
+                    // Принудительно закрываем WebApp через небольшой таймаут
+                    setTimeout(() => {
+                        console.log('Closing WebApp...');
+                        window.Telegram.WebApp.close();
+                    }, 500);
+                } else {
+                    console.error('Telegram WebApp not available');
+                    alert('Ошибка: Telegram WebApp недоступен');
+                }
+            } catch (error) {
+                console.error('Error sending data:', error);
+                alert('Ошибка отправки данных: ' + error.message);
+            }
         }
     </script>
 </body>
