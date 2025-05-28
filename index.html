@@ -477,7 +477,7 @@
                     microCtx.drawImage(tempImg, 0, 0, 150, 60);
                     
                     // Получаем сжатое изображение с лучшим качеством
-                    const microImageData = microCanvas.toDataURL('image/jpeg', 0.8);
+                    const microImageData = microCanvas.toDataURL('image/jpeg', 1.0);
                     
                     console.log('Micro image size:', microImageData.length, 'characters');
                     
