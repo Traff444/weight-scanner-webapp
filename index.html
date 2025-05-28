@@ -464,58 +464,21 @@
             console.log('Sending data to bot...');
             
             try {
-                // Проверяем размер изображения
-                console.log('Original image data size:', imageData.length, 'characters');
-                
-                // Если данные слишком большие, сжимаем ещё сильнее
-                let processedImageData = imageData;
-                if (imageData.length > 50000) { // Если больше 50KB
-                    console.log('Image too large, compressing further...');
-                    
-                    // Создаём временный canvas для дополнительного сжатия
-                    const tempCanvas = document.createElement('canvas');
-                    const tempCtx = tempCanvas.getContext('2d');
-                    const tempImg = new Image();
-                    
-                    tempImg.onload = function() {
-                        // Ещё больше уменьшаем размер
-                        tempCanvas.width = 50;
-                        tempCanvas.height = 20;
-                        tempCtx.drawImage(tempImg, 0, 0, 50, 20);
-                        processedImageData = tempCanvas.toDataURL('image/jpeg', 0.1);
-                        console.log('Compressed image data size:', processedImageData.length, 'characters');
-                        continueWithSending(processedImageData);
-                    };
-                    
-                    tempImg.src = imageData;
-                    return; // Выходим, продолжим в onload
-                }
-                
-                continueWithSending(processedImageData);
-                
-            } catch (error) {
-                console.error('Error in sendToBot:', error);
-                alert('Ошибка подготовки данных: ' + error.message);
-            }
-        }
-        
-        function continueWithSending(imageData) {
-            try {
+                // Вместо отправки изображения отправляем только метаданные
                 const dataToSend = JSON.stringify({
-                    type: 'weight_photo',
-                    image: imageData,
+                    type: 'weight_scan_request',
+                    message: 'Пользователь обрезал фото в WebApp',
+                    crop_area: {
+                        x: Math.round((canvas.width - 200) / 2),
+                        y: Math.round((canvas.height - 80) / 2),
+                        width: 200,
+                        height: 80
+                    },
                     timestamp: Date.now()
                 });
                 
                 console.log('Final data size:', dataToSend.length, 'characters');
-                console.log('Data size in bytes:', new Blob([dataToSend]).size);
-                
-                // Telegram WebApp имеет лимит на размер данных
-                if (dataToSend.length > 4096) {
-                    console.error('Data too large for Telegram WebApp:', dataToSend.length, '> 4096');
-                    alert('Изображение слишком большое. Попробуйте сделать фото ближе к цифрам.');
-                    return;
-                }
+                console.log('Data content:', dataToSend);
                 
                 // Проверяем, что WebApp готов
                 if (window.Telegram && window.Telegram.WebApp) {
