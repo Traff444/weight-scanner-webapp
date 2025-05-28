@@ -403,11 +403,11 @@
         }
         
         function cropAndSend() {
-            // Размеры рамки (200x80 по центру)
-            const frameWidth = 200;
-            const frameHeight = 80;
-            const frameX = (canvas.width - frameWidth) / 2;
-            const frameY = (canvas.height - frameHeight) / 2;
+            // Размеры рамки (100x40 вместо 200x80 для уменьшения размера данных)
+            const frameWidth = 100;
+            const frameHeight = 40;
+            const frameX = (canvas.width - frameWidth * 2) / 2; // Позиция для визуальной рамки 200x80
+            const frameY = (canvas.height - frameHeight * 2) / 2;
             
             // Создаём canvas для обрезанного изображения
             const cropCanvas = document.createElement('canvas');
@@ -415,9 +415,14 @@
             cropCanvas.height = frameHeight;
             const cropCtx = cropCanvas.getContext('2d');
             
-            // Вычисляем координаты на исходном изображении
-            const sourceX = (frameX - offsetX) / scale;
-            const sourceY = (frameY - offsetY) / scale;
+            // Вычисляем координаты на исходном изображении (берём центральную часть рамки)
+            const visualFrameWidth = 200;
+            const visualFrameHeight = 80;
+            const visualFrameX = (canvas.width - visualFrameWidth) / 2;
+            const visualFrameY = (canvas.height - visualFrameHeight) / 2;
+            
+            const sourceX = (visualFrameX - offsetX) / scale + (visualFrameWidth / scale - frameWidth / scale) / 2;
+            const sourceY = (visualFrameY - offsetY) / scale + (visualFrameHeight / scale - frameHeight / scale) / 2;
             const sourceWidth = frameWidth / scale;
             const sourceHeight = frameHeight / scale;
             
@@ -428,17 +433,17 @@
                 0, 0, frameWidth, frameHeight
             );
             
-            // Показываем результат
+            // Показываем результат (увеличиваем для отображения)
             const resultCanvas = document.getElementById('resultCanvas');
-            resultCanvas.width = frameWidth;
-            resultCanvas.height = frameHeight;
+            resultCanvas.width = frameWidth * 2;
+            resultCanvas.height = frameHeight * 2;
             const resultCtx = resultCanvas.getContext('2d');
-            resultCtx.drawImage(cropCanvas, 0, 0);
+            resultCtx.drawImage(cropCanvas, 0, 0, frameWidth * 2, frameHeight * 2);
             
             showStep(3);
             
-            // Отправляем в бот
-            const croppedImage = cropCanvas.toDataURL('image/jpeg', 0.8);
+            // Отправляем в бот (очень сжато)
+            const croppedImage = cropCanvas.toDataURL('image/jpeg', 0.3);
             setTimeout(() => {
                 sendToBot(croppedImage);
             }, 1000);
@@ -459,13 +464,58 @@
             console.log('Sending data to bot...');
             
             try {
+                // Проверяем размер изображения
+                console.log('Original image data size:', imageData.length, 'characters');
+                
+                // Если данные слишком большие, сжимаем ещё сильнее
+                let processedImageData = imageData;
+                if (imageData.length > 50000) { // Если больше 50KB
+                    console.log('Image too large, compressing further...');
+                    
+                    // Создаём временный canvas для дополнительного сжатия
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    const tempImg = new Image();
+                    
+                    tempImg.onload = function() {
+                        // Ещё больше уменьшаем размер
+                        tempCanvas.width = 50;
+                        tempCanvas.height = 20;
+                        tempCtx.drawImage(tempImg, 0, 0, 50, 20);
+                        processedImageData = tempCanvas.toDataURL('image/jpeg', 0.1);
+                        console.log('Compressed image data size:', processedImageData.length, 'characters');
+                        continueWithSending(processedImageData);
+                    };
+                    
+                    tempImg.src = imageData;
+                    return; // Выходим, продолжим в onload
+                }
+                
+                continueWithSending(processedImageData);
+                
+            } catch (error) {
+                console.error('Error in sendToBot:', error);
+                alert('Ошибка подготовки данных: ' + error.message);
+            }
+        }
+        
+        function continueWithSending(imageData) {
+            try {
                 const dataToSend = JSON.stringify({
                     type: 'weight_photo',
                     image: imageData,
                     timestamp: Date.now()
                 });
                 
-                console.log('Data prepared, size:', dataToSend.length);
+                console.log('Final data size:', dataToSend.length, 'characters');
+                console.log('Data size in bytes:', new Blob([dataToSend]).size);
+                
+                // Telegram WebApp имеет лимит на размер данных
+                if (dataToSend.length > 4096) {
+                    console.error('Data too large for Telegram WebApp:', dataToSend.length, '> 4096');
+                    alert('Изображение слишком большое. Попробуйте сделать фото ближе к цифрам.');
+                    return;
+                }
                 
                 // Проверяем, что WebApp готов
                 if (window.Telegram && window.Telegram.WebApp) {
