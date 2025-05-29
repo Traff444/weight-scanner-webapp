@@ -267,6 +267,7 @@
                 console.log('Image loaded successfully:', currentImage.width, 'x', currentImage.height);
                 initEditor();
                 showStep(2);
+                afterPhotoSelected();
             };
             currentImage.onerror = function() {
                 console.error('Failed to load image');
@@ -495,42 +496,46 @@
                 
                 console.log('Crop coordinates calculated:', cropData);
                 
+                const messageId = document.getElementById('messageIdInput').value;
+                if (!messageId) {
+                    alert('Пожалуйста, введите номер сообщения с фото!');
+                    return;
+                }
+                
                 const finalData = {
                     type: 'weight_crop_coordinates',
                     message: 'Координаты для обрезки последнего фото',
                     crop_data: cropData,
-                            timestamp: Date.now()
-                        };
-                    
-                    const dataToSend = JSON.stringify(finalData);
-                    console.log('Final data size:', dataToSend.length, 'characters');
+                    photo_message_id: messageId,
+                    timestamp: Date.now()
+                };
+                
+                console.log('Final data size:', JSON.stringify(finalData).length, 'characters');
                 console.log('Data content:', finalData);
-                    
-                    // Проверяем, что WebApp готов
-                    if (window.Telegram && window.Telegram.WebApp) {
+                
+                // Проверяем, что WebApp готов
+                if (window.Telegram && window.Telegram.WebApp) {
                     console.log('WebApp is ready, sending coordinates...');
                     
                     try {
-                        window.Telegram.WebApp.sendData(dataToSend);
+                        window.Telegram.WebApp.sendData(JSON.stringify(finalData));
                         console.log('Coordinates sent successfully');
                     } catch (sendError) {
                         console.error('Error sending data:', sendError);
                     }
-                        
+                    
                     // Принудительно закрываем WebApp
-                            console.log('Closing WebApp...');
-                            window.Telegram.WebApp.close();
+                    console.log('Closing WebApp...');
+                    window.Telegram.WebApp.close();
                     
                     setTimeout(() => {
                         console.log('Fallback closing WebApp...');
                         window.Telegram.WebApp.close();
                     }, 100);
-                    
-                    } else {
-                        console.error('Telegram WebApp not available');
-                        alert('Ошибка: Telegram WebApp недоступен');
-                    }
-                
+                } else {
+                    console.error('Telegram WebApp not available');
+                    alert('Ошибка: Telegram WebApp недоступен');
+                }
             } catch (error) {
                 console.error('Error in sendToBot:', error);
                 alert('Ошибка отправки данных: ' + error.message);
@@ -538,6 +543,19 @@
                     window.Telegram.WebApp.close();
                 }
             }
+        }
+
+        // После выбора фото показываем popup-инструкцию
+        function afterPhotoSelected() {
+            Telegram.WebApp.showPopup({
+                title: 'Отправьте фото',
+                message: 'Пожалуйста, отправьте выбранное фото в чат с ботом как обычное фото, затем вернитесь сюда и выделите область.',
+                buttons: [
+                    {id: 'ok', type: 'ok', text: 'ОК'}
+                ]
+            });
+            // Показываем поле для ввода message_id
+            document.getElementById('messageIdInputContainer').style.display = 'block';
         }
     </script>
 </body>
