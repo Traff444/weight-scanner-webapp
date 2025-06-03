@@ -145,6 +145,18 @@
             font-size: 14px;
             color: #0066cc;
         }
+
+        #messageIdInputContainer {
+            display: none;
+            margin: 15px 0;
+        }
+
+        #messageIdInput {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
@@ -188,7 +200,12 @@
                 <button class="zoom-btn" onclick="resetZoom()">↻</button>
                 <button class="zoom-btn" onclick="zoomIn()">🔍+</button>
             </div>
-            
+
+            <div id="messageIdInputContainer">
+                <label for="messageIdInput">Номер сообщения с фото:</label>
+                <input id="messageIdInput" type="number" placeholder="Введите номер сообщения">
+            </div>
+
             <div class="controls">
                 <button class="btn" onclick="goBack()">← Назад</button>
                 <button class="btn" onclick="cropAndSend()">✂️ Обрезать и отправить</button>
